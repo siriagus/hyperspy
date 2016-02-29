@@ -467,7 +467,7 @@ def quantification_zeta_factor(intensities,
         The list of kfactor in same order as  intensities eg. zfactors =
         [1, 1.47, 1.72] for ['Al_Ka','Cr_Ka', 'Ni_Ka']
     dose: float
-        the dose given by i*t*N, i the current, t the acquisition time, and N
+        the electron dose given by i*t*N, i the current, t the acquisition time, and N
         the number of electron by unit electric charge.
 
     Return

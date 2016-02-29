@@ -473,9 +473,10 @@ class EDSTEMSpectrum(EDSSpectrum):
                        closing=True,
                        plot_result=False,
                        store_in_mp=True,
+                       dose='auto',
                        **kwargs):
         """
-        Quantification using Cliff-Lorimer or zeta-factor method
+        Quantification using Cliff-Lorimer or the zeta-factor method
 
         Parameters
         ----------
@@ -483,7 +484,7 @@ class EDSTEMSpectrum(EDSSpectrum):
             the intensitiy for each X-ray lines.
         kfactors: list of float
             The list of kfactor (or zfactor) in same order as intensities.
-            Note that intensities provided by hyperspy are sorted by the
+            Note that intensities provided by HyperSpy are sorted by the
             aplhabetical order of the X-ray lines.
             eg. kfactors =[0.982, 1.32, 1.60] for ['Al_Ka','Cr_Ka', 'Ni_Ka'].
         method: 'CL' or 'zeta'
@@ -502,6 +503,8 @@ class EDSTEMSpectrum(EDSSpectrum):
         plot_result : bool
             If True, plot the calculated composition. If the current
             object is a single spectrum it prints the result instead.
+        dose: float
+            Electron dose in nanoampere.
         kwargs
             The extra keyword arguments are passed to plot.
 
@@ -523,15 +526,27 @@ class EDSTEMSpectrum(EDSSpectrum):
         Fe (Fe_Ka): Composition = 15.41 atomic percent
         Pt (Pt_La): Composition = 84.59 atomic percent
 
+        >>> zfacs = [873.49, 737.89] # As_Ka, Ga_Ka
+        >>> s2.add_elements(['As', 'Ga'])
+        >>> s2.add_lines()
+        >>> s2.metadata.Acquisition_instrument.TEM.beam_current = 0.6296 # probe current in nanoampere
+        >>> s2.metadata.Acquisition_instrument.TEM.Detector.EDS.real_time = 0.2 # acquisition time
+        >>> s2_intensities = s2.get_lines_intensity()
+        >>> composition, mass_thickness = s2.quantification(intensities=s2_intensities, method='zeta', kfactors=zfacs)
+        >>> hs.plot.plot_images(composition) # Plot composition, assuming 2D
+        >>> thickness_map = (mass_thickness * 1e9 / DENSITY)
+        >>> thickness_map.plot() # Plot thickness map
+
         See also
         --------
         vacuum_mask
+        get_dose
         """
 
         if kfactors == 'auto':
             if method == 'CL':
                 kfactors = self.metadata.Sample.kfactors
-            elif method == 'zetha':
+            elif method == 'zeta':
                 kfactors = self.metadata.Sample.zfactors
         if intensities == 'auto':
             intensities = self.metadata.Sample.intensities
@@ -542,16 +557,22 @@ class EDSTEMSpectrum(EDSSpectrum):
             navigation_mask = navigation_mask.data
         xray_lines = self.metadata.Sample.xray_lines
         composition = utils.stack(intensities)
+
         if method == 'CL':
             composition.data = utils_eds.quantification_cliff_lorimer(
                 composition.data, kfactors=kfactors,
                 mask=navigation_mask) * 100.
         elif method == 'zeta':
+            if dose == 'auto':
+                dose = self.get_dose()
+
             results = utils_eds.quantification_zeta_factor(
-                composition.data, zfactors=kfactors, dose=self.get_dose())
+                composition.data, zfactors=kfactors, dose=dose)
             composition.data = results[0] * 100.
-            mass_thickness = intensities[0]
+            mass_thickness = intensities[0].deepcopy()
             mass_thickness.data = results[1]
+            mass_thickness.metadata.General.title = "Mass thickness"
+
         composition = composition.split()
         if composition_units == 'atomic':
             composition = utils.material.weight_to_atomic(composition)
@@ -569,16 +590,18 @@ class EDSTEMSpectrum(EDSSpectrum):
                          composition_units))
         if plot_result and composition[i].axes_manager.signal_dimension != 0:
             utils.plot.plot_signals(composition, **kwargs)
-        return composition
 
-        if store_in_mp:
-            for i, compo in enumerate(composition):
-                self._set_result(
-                    xray_line=xray_lines[i], result='quant',
-                    data_res=compo.data, plot_result=False,
-                    store_in_mp=store_in_mp)
-            if method == 'zetha':
-                self.metadata.set_item("Sample.mass_thickness", mass_thickness)
+        # if store_in_mp:
+        #     for i, compo in enumerate(composition):
+        #         self._set_result(
+        #             xray_line=xray_lines[i], result='quant',
+        #             data_res=compo.data, plot_result=False,
+        #             store_in_mp=store_in_mp)
+        #     if method == 'zeta':
+        #         self.metadata.set_item("Sample.mass_thickness", mass_thickness)
+        
+        if method == 'zeta':
+            return composition, mass_thickness
         else:
             return composition
 
@@ -1216,8 +1239,10 @@ class EDSTEMSpectrum(EDSSpectrum):
 
         Parameters
         ----------
-        beam_current:
-        real_time:
+        beam_current: float
+            Probe current in nano-Ampere
+        real_time: float
+            Acquisition time in seconds
         """
         parameters = self.metadata.Acquisition_instrument.TEM
         if beam_current == 'auto':
