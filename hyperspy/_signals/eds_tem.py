@@ -473,7 +473,6 @@ class EDSTEMSpectrum(EDSSpectrum):
                        closing=True,
                        plot_result=False,
                        store_in_mp=True,
-                       dose='auto',
                        **kwargs):
         """
         Quantification using Cliff-Lorimer or the zeta-factor method
@@ -503,8 +502,6 @@ class EDSTEMSpectrum(EDSSpectrum):
         plot_result : bool
             If True, plot the calculated composition. If the current
             object is a single spectrum it prints the result instead.
-        dose: float
-            Electron dose in nanoampere.
         kwargs
             The extra keyword arguments are passed to plot.
 
@@ -563,11 +560,8 @@ class EDSTEMSpectrum(EDSSpectrum):
                 composition.data, kfactors=kfactors,
                 mask=navigation_mask) * 100.
         elif method == 'zeta':
-            if dose == 'auto':
-                dose = self.get_dose()
-
             results = utils_eds.quantification_zeta_factor(
-                composition.data, zfactors=kfactors, dose=dose)
+                composition.data, zfactors=kfactors, dose=self.get_dose())
             composition.data = results[0] * 100.
             mass_thickness = intensities[0].deepcopy()
             mass_thickness.data = results[1]
@@ -1250,3 +1244,24 @@ class EDSTEMSpectrum(EDSSpectrum):
         if real_time == 'auto':
             real_time = parameters.Detector.EDS.real_time
         return real_time * beam_current * 1e-9 / constants.e
+
+    def set_dose_parameters(self, beam_current, real_time, pixel_size):
+        """
+        Set the parameters for the electron dose.
+
+        Parameters
+        ----------
+        beam_current: float
+            Beam current in nanoampere
+
+        real_time:
+            Acquisition time in seconds
+
+        pixel_size: float
+            Pixel size
+        """
+        self.metadata.Acquisition_instrument.TEM.beam_current = beam_current
+        self.metadata.Acquisition_instrument.TEM.Detector.EDS.real_time = real_time
+        self.metadata.Acquisition_instrument.TEM.pixel_size = pixel_size
+
+    # def set_dose_parameters_gui(self):
