@@ -78,7 +78,9 @@ class EDSTEMSpectrum(EDSSpectrum):
                                   tilt_stage=None,
                                   azimuth_angle=None,
                                   elevation_angle=None,
-                                  energy_resolution_MnKa=None):
+                                  energy_resolution_MnKa=None,
+                                  beam_current=None,
+                                  real_time=None):
         """Set the microscope parameters.
 
         If no arguments are given, raises an interactive mode to fill
@@ -98,6 +100,10 @@ class EDSTEMSpectrum(EDSSpectrum):
             In degree
         energy_resolution_MnKa : float
             In eV
+        beam_current: float
+            In nA
+        real_time: float
+            In second
 
         Examples
         --------
@@ -134,9 +140,18 @@ class EDSTEMSpectrum(EDSSpectrum):
                 "Acquisition_instrument.TEM.Detector.EDS." +
                 "energy_resolution_MnKa",
                 energy_resolution_MnKa)
+        if beam_current is not None:
+            md.set_item(
+                "Acquisition_instrument.TEM.beam_current",
+                beam_current)
+        if real_time is not None:
+            md.set_item(
+                "Acquisition_instrument.TEM.Detector.EDS.real_time",
+                real_time)
 
         if set([beam_energy, live_time, tilt_stage, azimuth_angle,
-                elevation_angle, energy_resolution_MnKa]) == {None}:
+                elevation_angle, energy_resolution_MnKa,
+                beam_current, real_time]) == {None}:
             self._are_microscope_parameters_missing()
 
     @only_interactive
@@ -154,7 +169,12 @@ class EDSTEMSpectrum(EDSSpectrum):
             'Acquisition_instrument.TEM.Detector.EDS.elevation_angle':
             'tem_par.elevation_angle',
             'Acquisition_instrument.TEM.Detector.EDS.energy_resolution_MnKa':
-            'tem_par.energy_resolution_MnKa', }
+            'tem_par.energy_resolution_MnKa',
+            'Acquisition_instrument.TEM.beam_current':
+            'tem_par.beam_current',
+            'Acquisition_instrument.TEM.Detector.EDS.real_time':
+            'tem_par.real_time', }
+
         for key, value in mapping.iteritems():
             if self.metadata.has_item(key):
                 exec('%s = self.metadata.%s' % (value, key))
@@ -172,20 +192,27 @@ class EDSTEMSpectrum(EDSSpectrum):
             'Acquisition_instrument.TEM.Detector.EDS.elevation_angle':
             tem_par.elevation_angle,
             'Acquisition_instrument.TEM.Detector.EDS.energy_resolution_MnKa':
-            tem_par.energy_resolution_MnKa, }
+            tem_par.energy_resolution_MnKa, 
+            'Acquisition_instrument.TEM.beam_current':
+            tem_par.beam_current,
+            'Acquisition_instrument.TEM.Detector.EDS.real_time':
+            tem_par.real_time, }
 
         for key, value in mapping.iteritems():
             if value != t.Undefined:
                 self.metadata.set_item(key, value)
         self._are_microscope_parameters_missing()
 
-    def _are_microscope_parameters_missing(self):
+    def _are_microscope_parameters_missing(self, must_exist='default'):
         """Check if the EDS parameters necessary for quantification
         are defined in metadata. Raise in interactive mode
          an UI item to fill or cahnge the values"""
-        must_exist = (
-            'Acquisition_instrument.TEM.beam_energy',
-            'Acquisition_instrument.TEM.Detector.EDS.live_time',)
+
+        if must_exist == 'default':
+            must_exist = (
+                'Acquisition_instrument.TEM.beam_energy',
+                'Acquisition_instrument.TEM.Detector.EDS.live_time',
+                )
 
         missing_parameters = []
         for item in must_exist:
@@ -560,6 +587,7 @@ class EDSTEMSpectrum(EDSSpectrum):
                 composition.data, kfactors=kfactors,
                 mask=navigation_mask) * 100.
         elif method == 'zeta':
+            self._are_microscope_parameters_missing(['Acquisition_instrument.TEM.beam_current', 'Acquisition_instrument.TEM.Detector.EDS.real_time'])
             results = utils_eds.quantification_zeta_factor(
                 composition.data, zfactors=kfactors, dose=self.get_dose())
             composition.data = results[0] * 100.
@@ -1244,24 +1272,3 @@ class EDSTEMSpectrum(EDSSpectrum):
         if real_time == 'auto':
             real_time = parameters.Detector.EDS.real_time
         return real_time * beam_current * 1e-9 / constants.e
-
-    def set_dose_parameters(self, beam_current, real_time, pixel_size):
-        """
-        Set the parameters for the electron dose.
-
-        Parameters
-        ----------
-        beam_current: float
-            Beam current in nanoampere
-
-        real_time:
-            Acquisition time in seconds
-
-        pixel_size: float
-            Pixel size
-        """
-        self.metadata.Acquisition_instrument.TEM.beam_current = beam_current
-        self.metadata.Acquisition_instrument.TEM.Detector.EDS.real_time = real_time
-        self.metadata.Acquisition_instrument.TEM.pixel_size = pixel_size
-
-    # def set_dose_parameters_gui(self):

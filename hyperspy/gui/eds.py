@@ -68,13 +68,20 @@ class TEMParametersUI(t.HasTraits):
                               label='Elevation angle (degree)')
     energy_resolution_MnKa = t.Float(t.Undefined,
                                      label='Energy resolution MnKa (eV)')
+    beam_current = t.Float(t.Undefined,
+                           label='Beam current (nA)')
+    real_time = t.Float(t.Undefined,
+                        label='Real time (s)')
+
 
     traits_view = tu.View(
         tu.Group('beam_energy',
                  'tilt_stage',
+                 'beam_current',
                  label='TEM', show_border=True),
         tu.Group('live_time', 'azimuth_angle',
                  'elevation_angle', 'energy_resolution_MnKa',
+                 'real_time',
                  label='EDS', show_border=True),
         kind='modal', buttons=[OKButton, CancelButton],
         title='TEM parameters definition wizard')
